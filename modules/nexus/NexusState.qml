@@ -16,6 +16,7 @@ QtObject {
     property int editingVpnIndex: -1
     property string selectedNetworkSsid
     property string selectedEthernetInterface
+    property string selectedMonitor
     property bool networkDetailsFromSaved
 
     signal close
