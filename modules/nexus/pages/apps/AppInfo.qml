@@ -2,9 +2,11 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Widgets
+import Caelestia.Components
 import Caelestia.Config
 import Caelestia.I18n
 import qs.components
+import qs.components.controls
 import qs.services
 import qs.utils
 import qs.modules.nexus.common
@@ -15,6 +17,8 @@ PageBase {
     readonly property DesktopEntry app: nState.selectedApp
     readonly property bool favouriteByRegex: app && matchedByRegex(GlobalConfig.launcher.favouriteApps, app.id)
     readonly property bool hiddenByRegex: app && matchedByRegex(GlobalConfig.launcher.hiddenApps, app.id)
+    readonly property bool uninstalling: !!app && Uninstaller.busyAppId === app.id
+    property var installInfo: null
 
     function isRegexEntry(s: string): bool {
         return /^\^.*\$$/.test(s);
@@ -24,11 +28,26 @@ PageBase {
         return filterList.some(f => isRegexEntry(f) && new RegExp(f).test(id));
     }
 
+    function inspectApp(): void {
+        const id = app?.id;
+        installInfo = null;
+        if (!id)
+            return;
+        Uninstaller.inspect(app, result => {
+            // The page might be gone by now, e.g. when the app was just uninstalled
+            if (root?.app?.id === id)
+                root.installInfo = result;
+        });
+    }
+
     onAppChanged: {
         // Auto close when app lost
         if (!app)
             nState.closeSubPage();
+        else
+            inspectApp();
     }
+    Component.onCompleted: inspectApp()
 
     title: Tr.tr("App info")
     isSubPage: true
@@ -74,6 +93,56 @@ PageBase {
             }
         }
 
+        ButtonRow {
+            Layout.bottomMargin: Tokens.spacing.large - parent.spacing
+            Layout.alignment: Qt.AlignHCenter
+            Layout.minimumWidth: Math.round(root.cappedWidth * 0.5)
+            spacing: Tokens.spacing.small
+
+            ButtonBase {
+                id: uninstallBtn
+
+                fillWidth: true
+                shapeMorph: true
+                isRound: true
+
+                inactiveColour: Colours.palette.m3errorContainer
+                inactiveOnColour: Colours.palette.m3onErrorContainer
+                stateLayer.disabled: root.uninstalling
+
+                implicitWidth: uninstallBtnContent.implicitWidth + Tokens.padding.extraLarge * 2
+                implicitHeight: uninstallBtnText.implicitHeight + Tokens.padding.medium * 2
+
+                onClicked: uninstallDialog.openFor(root.app)
+
+                RowLayout {
+                    id: uninstallBtnContent
+
+                    anchors.centerIn: parent
+                    spacing: Tokens.spacing.small
+
+                    LoadingIndicator {
+                        visible: root.uninstalling
+                        implicitSize: uninstallBtnText.implicitHeight
+                    }
+
+                    MaterialIcon {
+                        visible: !root.uninstalling
+                        text: "delete"
+                        color: uninstallBtn.onColour
+                        fontStyle: Tokens.font.icon.medium
+                    }
+
+                    StyledText {
+                        id: uninstallBtnText
+
+                        text: root.uninstalling ? Tr.tr("Uninstalling…") : Uninstaller.actionLabel(root.installInfo)
+                        color: uninstallBtn.onColour
+                    }
+                }
+            }
+        }
+
         // Launcher
         SectionHeader {
             first: true
@@ -115,16 +184,38 @@ PageBase {
             first: true
             label: Tr.tr("App ID")
             value: root.app?.id ?? ""
-            labelComp.Layout.preferredWidth: Math.max(labelComp.implicitWidth, command.labelComp.implicitWidth)
+            labelComp.Layout.preferredWidth: Math.max(labelComp.implicitWidth, command.labelComp.implicitWidth, installedWith.labelComp.implicitWidth)
         }
 
         WrapInfoRow {
             id: command
 
-            last: true
             label: Tr.tr("Command")
             value: (root.app?.command ?? []).join(" ")
-            labelComp.Layout.preferredWidth: Math.max(labelComp.implicitWidth, appId.labelComp.implicitWidth)
+            labelComp.Layout.preferredWidth: Math.max(labelComp.implicitWidth, appId.labelComp.implicitWidth, installedWith.labelComp.implicitWidth)
+        }
+
+        WrapInfoRow {
+            id: installedWith
+
+            last: true
+            label: Tr.tr("Installed with")
+            value: {
+                const info = root.installInfo;
+                if (!info)
+                    return Tr.tr("Checking…");
+                const parts = [Uninstaller.sourceLabel(info)];
+                if (info.package)
+                    parts.push([info.package, info.version ?? ""].join(" ").trim());
+                return parts.join(" · ");
+            }
+            labelComp.Layout.preferredWidth: Math.max(labelComp.implicitWidth, appId.labelComp.implicitWidth, command.labelComp.implicitWidth)
+        }
+
+        UninstallDialog {
+            id: uninstallDialog
+
+            rootParent: root.flickable
         }
     }
 
