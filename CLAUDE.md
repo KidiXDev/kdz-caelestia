@@ -20,7 +20,7 @@ Personal fork of [caelestia-dots/shell](https://github.com/caelestia-dots/shell)
 ## How the shell runs on this machine
 
 - The upstream shell comes from the AUR package `caelestia-shell-git`: QML in `/etc/xdg/quickshell/caelestia`, plugin in `/usr/lib/qt6/qml/Caelestia`, `/usr/lib/caelestia/version`. `quickshell-git` and `caelestia-cli` are also installed.
-- `caelestia shell -d` / `-r` / `-k` run `qs -c caelestia`. Quickshell looks in `~/.config/quickshell/caelestia` first, then `/etc/xdg/quickshell/caelestia`.
+- `caelestia shell -d` / `-r` / `-k` run `qs -c caelestia`. `-r` without `-d` restarts in the foreground, so Ctrl+C kills the shell. Scripts must use `-r -d`. Quickshell looks in `~/.config/quickshell/caelestia` first, then `/etc/xdg/quickshell/caelestia`.
 - To see which config is running: `qs list --all` (look for `Config path`).
 - Never `sudo cmake --install` to `/`. It overwrites files owned by the pacman package.
 

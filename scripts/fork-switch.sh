@@ -20,7 +20,7 @@ current() {
 
 restart() {
     echo ":: Restarting shell"
-    caelestia shell -r
+    caelestia shell -r -d
 }
 
 # Moves a real (non-symlink) config dir aside so it is never lost.
