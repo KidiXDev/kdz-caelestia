@@ -7,12 +7,19 @@ import Quickshell.Widgets
 import Caelestia.Config
 import Caelestia.I18n
 import qs.components
+import qs.components.controls
 import qs.services
 import qs.utils
 import qs.modules.nexus.common
 
 PageBase {
     id: root
+
+    readonly property string query: search.text.trim().toLowerCase()
+
+    function matches(app: DesktopEntry): bool {
+        return !query || [app.name, app.genericName, app.id].some(s => s?.toLowerCase().includes(query));
+    }
 
     title: Tr.tr("All apps")
     isSubPage: true
@@ -23,10 +30,21 @@ PageBase {
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 
+        SearchBar {
+            id: search
+
+            Layout.fillWidth: true
+            Layout.bottomMargin: Tokens.spacing.large - parent.spacing
+
+            placeholderText: Tr.tr("Search apps")
+            font: Tokens.font.body.large
+            searchIcon.fontStyle: Tokens.font.icon.medium
+        }
+
         Repeater {
             id: list
 
-            model: [...DesktopEntries.applications.values].sort((a, b) => a.name.localeCompare(b.name))
+            model: [...DesktopEntries.applications.values].filter(a => root.matches(a)).sort((a, b) => a.name.localeCompare(b.name))
 
             ConnectedRect {
                 id: appItem
@@ -90,6 +108,20 @@ PageBase {
                         fontStyle: Tokens.font.icon.small
                     }
 
+                    LoadingIndicator {
+                        visible: Uninstaller.busyAppId === appItem.modelData.id
+                        implicitSize: uninstallBtn.implicitHeight
+                    }
+
+                    IconButton {
+                        id: uninstallBtn
+
+                        visible: Uninstaller.busyAppId !== appItem.modelData.id
+                        icon: "delete"
+                        type: IconButton.Text
+                        onClicked: uninstallDialog.openFor(appItem.modelData)
+                    }
+
                     MaterialIcon {
                         text: "chevron_right"
                         color: Colours.palette.m3onSurfaceVariant
@@ -97,6 +129,44 @@ PageBase {
                     }
                 }
             }
+        }
+
+        ConnectedRect {
+            Layout.fillWidth: true
+            visible: list.count === 0
+            first: true
+            last: true
+            implicitHeight: empty.implicitHeight + Tokens.padding.extraLarge * 2
+
+            ColumnLayout {
+                id: empty
+
+                anchors.centerIn: parent
+                width: parent.width - Tokens.padding.largeIncreased * 2
+                spacing: Tokens.padding.extraSmall
+
+                MaterialIcon {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "search_off"
+                    color: Colours.palette.m3outlineVariant
+                    fontStyle: Tokens.font.icon.extraLarge
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    text: root.query ? Tr.tr("No apps match \"%1\"").arg(search.text.trim()) : Tr.tr("No apps installed")
+                    color: Colours.palette.m3outlineVariant
+                    font: Tokens.font.body.small
+                }
+            }
+        }
+
+        UninstallDialog {
+            id: uninstallDialog
+
+            rootParent: root.flickable
         }
     }
 }

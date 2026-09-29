@@ -66,7 +66,7 @@ QtObject {
         {
             label: Tr.tr("Apps"),
             icon: "apps",
-            description: Tr.tr("Default apps, favourites, hidden apps"),
+            description: Tr.tr("Default apps, favourites, uninstall"),
             category: "shell"
         },
         {
