@@ -16,13 +16,12 @@ QtObject {
         },
 
         // Connectivity
-        // TODO
-        // {
-        //     label: Tr.tr("Display"),
-        //     icon: "monitor",
-        //     description: Tr.tr("Output configuration"),
-        //     category: "connectivity"
-        // },
+        {
+            label: Tr.tr("Display"),
+            icon: "monitor",
+            description: Tr.tr("Resolution, refresh rate, arrangement"),
+            category: "connectivity"
+        },
         {
             label: Tr.tr("Network"),
             icon: "wifi",
@@ -67,7 +66,7 @@ QtObject {
         {
             label: Tr.tr("Apps"),
             icon: "apps",
-            description: Tr.tr("Default apps, favourites, hidden apps"),
+            description: Tr.tr("Default apps, favourites, uninstall"),
             category: "shell"
         },
         {

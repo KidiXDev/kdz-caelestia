@@ -30,6 +30,7 @@ ShellRoot {
     Background {}
     Drawers {}
     AreaPicker {}
+    DisplayOverlay {}
     Lock {
         id: lock
     }

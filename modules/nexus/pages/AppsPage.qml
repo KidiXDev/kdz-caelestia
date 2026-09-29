@@ -70,7 +70,7 @@ PageBase {
             last: true
             icon: "apps"
             text: Tr.tr("All apps")
-            subtext: Tr.tr("Browse installed apps, set favourites and hidden")
+            subtext: Tr.tr("Browse and uninstall apps, set favourites and hidden")
             onClicked: root.nState.openSubPage(1)
         }
     }

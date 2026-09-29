@@ -2,6 +2,7 @@
 
 #include <qdir.h>
 #include <qjsonarray.h>
+#include <qjsondocument.h>
 #include <qlocalsocket.h>
 #include <qloggingcategory.h>
 #include <qvariant.h>
@@ -44,6 +45,7 @@ HyprExtras::HyprExtras(QObject* parent)
 
     refreshOptions();
     refreshDevices();
+    refreshMonitors();
 
     m_socket = new QLocalSocket(this);
 
@@ -56,6 +58,10 @@ HyprExtras::HyprExtras(QObject* parent)
 
 QVariantHash HyprExtras::options() const {
     return m_options;
+}
+
+QVariantList HyprExtras::monitors() const {
+    return m_monitors;
 }
 
 HyprDevices* HyprExtras::devices() const {
@@ -74,16 +80,26 @@ void HyprExtras::message(const QString& message) {
     });
 }
 
-void HyprExtras::batchMessage(const QStringList& messages) {
+void HyprExtras::batchMessage(const QStringList& messages, const QJSValue& callback) {
     if (messages.isEmpty()) {
         return;
     }
 
-    makeRequest(u"[[BATCH]]"_s + messages.join(u";"_s), [](bool success, const QByteArray& res) {
-        if (!success) {
-            qCWarning(lcHypr) << "batchMessage: request error:" << QString::fromUtf8(res);
-        }
-    });
+    const auto request =
+        makeRequest(u"[[BATCH]]"_s + messages.join(u";"_s), [callback](bool success, const QByteArray& res) {
+            if (!success) {
+                qCWarning(lcHypr) << "batchMessage: request error:" << QString::fromUtf8(res);
+            }
+
+            if (callback.isCallable()) {
+                callback.call({ success, QString::fromUtf8(res) });
+            }
+        });
+
+    // No socket to send it to, so it's never going to reply
+    if (request.isNull() && callback.isCallable()) {
+        callback.call({ false, QString() });
+    }
 }
 
 void HyprExtras::applyOptions(const QVariantHash& options) {
@@ -114,9 +130,7 @@ void HyprExtras::applyOptions(const QVariantHash& options) {
 }
 
 void HyprExtras::refreshOptions() {
-    if (!m_optionsRefresh.isNull()) {
-        m_optionsRefresh->close();
-    }
+    cancelRequest(m_optionsRefresh);
 
     m_optionsRefresh = makeRequestJson(u"descriptions"_s, [this](bool success, const QJsonDocument& response) {
         m_optionsRefresh.reset();
@@ -144,14 +158,29 @@ void HyprExtras::refreshOptions() {
 }
 
 void HyprExtras::refreshDevices() {
-    if (!m_devicesRefresh.isNull()) {
-        m_devicesRefresh->close();
-    }
+    cancelRequest(m_devicesRefresh);
 
     m_devicesRefresh = makeRequestJson(u"devices"_s, [this](bool success, const QJsonDocument& response) {
         m_devicesRefresh.reset();
         if (success) {
             m_devices->updateLastIpcObject(response.object());
+        }
+    });
+}
+
+void HyprExtras::refreshMonitors() {
+    cancelRequest(m_monitorsRefresh);
+
+    m_monitorsRefresh = makeRequestJson(u"monitors all"_s, [this](bool success, const QJsonDocument& response) {
+        m_monitorsRefresh.reset();
+        if (!success || !response.isArray()) {
+            return;
+        }
+
+        const auto monitors = response.array().toVariantList();
+        if (m_monitors != monitors) {
+            m_monitors = monitors;
+            emit monitorsChanged();
         }
     });
 }
@@ -191,9 +220,23 @@ void HyprExtras::readEvent() {
 void HyprExtras::handleEvent(const QString& event) {
     if (event == u"configreloaded"_s) {
         refreshOptions();
+        refreshMonitors();
     } else if (event == u"activelayout"_s) {
         refreshDevices();
+    } else if (event == u"monitoradded"_s || event == u"monitorremoved"_s) {
+        refreshMonitors();
     }
+}
+
+void HyprExtras::cancelRequest(SocketPtr& socket) {
+    if (socket.isNull()) {
+        return;
+    }
+
+    // Drop the handlers first so closing doesn't report a partial response
+    socket->disconnect(this);
+    socket->close();
+    socket.reset();
 }
 
 HyprExtras::SocketPtr HyprExtras::makeRequestJson(
@@ -210,23 +253,39 @@ HyprExtras::SocketPtr HyprExtras::makeRequest(
     }
 
     auto socket = SocketPtr::create(this);
+    auto reply = QSharedPointer<PendingReply>::create();
 
-    QObject::connect(socket.data(), &QLocalSocket::connected, this, [=, this]() {
-        QObject::connect(socket.data(), &QLocalSocket::readyRead, this, [socket, callback]() {
-            auto response = socket->readAll();
-            callback(true, std::move(response));
-            socket->close();
-        });
-
+    QObject::connect(socket.data(), &QLocalSocket::connected, this, [socket, request]() {
         socket->write(request.toUtf8());
         socket->flush();
     });
 
-    QObject::connect(socket.data(), &QLocalSocket::errorOccurred, this, [=](QLocalSocket::LocalSocketError err) {
-        qCWarning(lcHypr) << "makeRequest: error making request:" << err << "| request:" << request;
-        callback(false, {});
-        socket->close();
+    // Large responses can arrive in several chunks, so only finish once Hyprland closes the connection
+    QObject::connect(socket.data(), &QLocalSocket::readyRead, this, [socket, reply]() {
+        reply->data += socket->readAll();
     });
+
+    QObject::connect(socket.data(), &QLocalSocket::disconnected, this, [socket, reply, callback]() {
+        if (reply->finished) {
+            return;
+        }
+
+        reply->finished = true;
+        reply->data += socket->readAll();
+        callback(true, reply->data);
+    });
+
+    QObject::connect(socket.data(), &QLocalSocket::errorOccurred, this,
+        [socket, reply, request, callback](QLocalSocket::LocalSocketError err) {
+            if (err == QLocalSocket::PeerClosedError || reply->finished) {
+                return;
+            }
+
+            reply->finished = true;
+            qCWarning(lcHypr) << "makeRequest: error making request:" << err << "| request:" << request;
+            callback(false, {});
+            socket->close();
+        });
 
     socket->connectToServer(m_requestSocket);
 

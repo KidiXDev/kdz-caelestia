@@ -16,6 +16,7 @@ Item {
     required property Item rootParent
     required property string icon
     required property string label
+    property string subtext
     required property string header
     required property Component content
     required property string acceptLabel
@@ -155,6 +156,7 @@ Item {
             last: true
             icon: root.icon
             text: root.label
+            subtext: root.subtext
             onClicked: root.open = true
         }
 
