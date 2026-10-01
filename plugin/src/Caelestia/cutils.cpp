@@ -112,6 +112,10 @@ QString CUtils::toLocalFile(const QUrl& url) {
     return url.toLocalFile();
 }
 
+void CUtils::setEnv(const QString& name, const QString& value) {
+    qputenv(name.toUtf8().constData(), value.toUtf8());
+}
+
 qreal CUtils::clamp(qreal value, qreal min, qreal max) {
     return qBound(min, value, max);
 }

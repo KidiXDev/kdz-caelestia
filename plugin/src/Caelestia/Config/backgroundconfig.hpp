@@ -51,6 +51,7 @@ class BackgroundConfig : public settings::ObjectNode {
 
     CONFIG_PROPERTY(bool, enabled, true)
     CONFIG_PROPERTY(bool, wallpaperEnabled, true)
+    CONFIG_PROPERTY(QString, videoDecoder, u"auto"_s) // auto, qsv, vaapi, cuda, vulkan or software
     CONFIG_SUBOBJECT(DesktopClock, desktopClock)
     CONFIG_SUBOBJECT(BackgroundVisualiser, visualiser)
 };

@@ -12,6 +12,7 @@
   swappy,
   wl-clipboard,
   libqalculate,
+  ffmpeg,
   bash,
   hyprland,
   material-symbols,
@@ -35,7 +36,7 @@
 }: let
   version = "1.0.0";
 
-  qs = quickshell.withModules [qt6.qtimageformats m3shapes];
+  qs = quickshell.withModules [qt6.qtimageformats qt6.qtmultimedia m3shapes];
 
   runtimeDeps =
     [
@@ -47,6 +48,7 @@
       swappy
       wl-clipboard
       libqalculate
+      ffmpeg
       bash
       hyprland
     ]

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import Caelestia.Config
 import qs.components
@@ -9,12 +10,23 @@ import qs.components.containers
 import qs.services
 
 Variants {
+    id: root
+
+    property bool locked
+
     model: Screens.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
 
     StyledWindow {
         id: win
 
         required property ShellScreen modelData
+
+        readonly property HyprlandMonitor monitor: Hypr.monitorFor(modelData)
+        // Only this monitor's workspaces count, so other monitors keep playing
+        readonly property bool covered: {
+            const special = monitor?.lastIpcObject.specialWorkspace?.name;
+            return Hypr.workspaces.values.some(ws => (ws === monitor?.activeWorkspace || (special && ws.name === special)) && ws.toplevels.values.some(t => t.lastIpcObject.fullscreen > 1));
+        }
 
         screen: modelData
         name: "background"
@@ -47,7 +59,9 @@ Variants {
                 anchors.fill: parent
                 active: Config.background.wallpaperEnabled
 
-                sourceComponent: Wallpaper {}
+                sourceComponent: Wallpaper {
+                    paused: GameMode.enabled || win.covered || root.locked
+                }
             }
 
             Visualiser {

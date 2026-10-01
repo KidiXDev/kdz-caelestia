@@ -8,6 +8,7 @@
 #include <qloggingcategory.h>
 #include <qmutex.h>
 #include <qpainter.h>
+#include <qprocess.h>
 #include <qsavefile.h>
 #include <qthreadpool.h>
 
@@ -49,6 +50,20 @@ QString fillSuffix(ImageCacher::FillMode fillMode) {
 }
 
 } // namespace
+
+QImage ImageCacher::readImage(const QString& path) {
+    QImage image(path);
+    if (!image.isNull())
+        return image;
+
+    QProcess ffmpeg;
+    ffmpeg.start(u"ffmpeg"_s, { u"-loglevel"_s, u"error"_s, u"-i"_s, path, u"-frames:v"_s, u"1"_s, u"-f"_s,
+                                  u"image2pipe"_s, u"-c:v"_s, u"png"_s, u"-"_s });
+    if (!ffmpeg.waitForFinished(10000) || ffmpeg.exitStatus() != QProcess::NormalExit || ffmpeg.exitCode() != 0)
+        return {};
+
+    return QImage::fromData(ffmpeg.readAllStandardOutput(), "PNG");
+}
 
 const QString& ImageCacher::cacheDir() {
     static const QString k_dir = [] {
@@ -107,7 +122,7 @@ void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, co
         return;
     }
 
-    QImage image(sourcePath);
+    QImage image = readImage(sourcePath);
     if (image.isNull()) {
         qCWarning(lcCacher).noquote() << "Failed to decode source" << sourcePath;
         return;

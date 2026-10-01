@@ -1,5 +1,6 @@
 #pragma once
 
+#include <qimage.h>
 #include <qmutex.h>
 #include <qobject.h>
 #include <qset.h>
@@ -19,6 +20,9 @@ public:
     };
 
     static ImageCacher* instance();
+
+    // Decodes an image, or the first frame of a video (via ffmpeg) if Qt can't read it
+    static QImage readImage(const QString& path);
 
     static const QString& cacheDir();
     static QString cachePathFor(const QString& sourcePath, const QSize& size, FillMode fillMode);

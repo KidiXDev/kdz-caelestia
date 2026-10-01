@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Caelestia.Config
+import Caelestia.Images
 import qs.components
 import qs.components.controls
 import qs.services
@@ -11,7 +12,7 @@ import qs.services
 Item {
     id: root
 
-    property alias source: img.source
+    property string source
     property alias text: label.text
     property alias radius: imgWrapper.radius
     property alias imgHeight: imgWrapper.implicitHeight
@@ -71,6 +72,7 @@ Item {
                 anchors.fill: parent
                 asynchronous: true
                 fillMode: Image.PreserveAspectCrop
+                source: IUtils.urlForPath(root.source, fillMode)
                 sourceSize: {
                     const dpr = (QsWindow.window as QsWindow)?.devicePixelRatio ?? 1;
                     return Qt.size(width * dpr, height * dpr);

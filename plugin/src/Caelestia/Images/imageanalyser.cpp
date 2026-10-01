@@ -7,6 +7,8 @@
 #include <qquickwindow.h>
 #include <qtconcurrentrun.h>
 
+#include "imagecacher.hpp"
+
 namespace {
 
 Q_LOGGING_CATEGORY(lcImageAnalyser, "caelestia.imageanalyser", QtInfoMsg)
@@ -150,7 +152,7 @@ void ImageAnalyser::update() {
         });
     } else {
         m_futureWatcher->setFuture(QtConcurrent::run([=, this](QPromise<AnalyseResult>& promise) {
-            const QImage image(m_source);
+            const QImage image = ImageCacher::readImage(m_source);
             analyse(promise, image, m_rescaleSize);
         }));
     }

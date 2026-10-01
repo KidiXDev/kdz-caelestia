@@ -81,7 +81,7 @@ void CachingImageResponse::process() {
     // If both dimensions are missing, return the original directly
     if (needsW && needsH) {
         qCDebug(lcCProv).noquote() << "Given source size is invalid, returning original:" << path;
-        m_image = QImage(path);
+        m_image = ImageCacher::readImage(path);
         if (m_image.isNull()) {
             m_error = u"Failed to decode source: "_s + path;
             qCWarning(lcCProv).noquote() << m_error;
@@ -91,8 +91,9 @@ void CachingImageResponse::process() {
 
     // If one dimension is missing, derive it from the source aspect ratio
     if (needsW || needsH) {
-        const QImageReader sourceReader(path);
-        const QSize sourceSize = sourceReader.size();
+        QSize sourceSize = QImageReader(path).size();
+        if (!sourceSize.isValid())
+            sourceSize = ImageCacher::readImage(path).size();
         if (!sourceSize.isValid() || sourceSize.isEmpty()) {
             m_error = u"Could not determine source size for: "_s + path;
             qCWarning(lcCProv).noquote() << m_error;
@@ -119,7 +120,7 @@ void CachingImageResponse::process() {
     // Schedule cache job (this call will return the original image, but later ones will use cache)
     ImageCacher::instance()->schedule(path, cachePath, size, m_fillMode);
 
-    m_image = QImage(path);
+    m_image = ImageCacher::readImage(path);
     if (m_image.isNull()) {
         m_error = u"Failed to decode source: "_s + path;
         qCWarning(lcCProv).noquote() << m_error;
