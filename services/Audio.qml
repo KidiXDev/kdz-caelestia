@@ -8,6 +8,7 @@ import Caelestia
 import Caelestia.Config
 import Caelestia.I18n
 import Caelestia.Services
+import qs.utils
 
 Singleton {
     id: root
@@ -18,6 +19,9 @@ Singleton {
     property list<PwNode> sinks: []
     property list<PwNode> sources: []
     property list<PwNode> streams: []
+
+    // User-set device names, keyed by the stable PipeWire node.name
+    property var customNames: ({})
 
     readonly property PwNode sink: Pipewire.defaultAudioSink
     readonly property PwNode source: Pipewire.defaultAudioSource
@@ -59,6 +63,23 @@ Singleton {
 
     function decrementSourceVolume(amount: real): void {
         setSourceVolume(sourceVolume - (amount || GlobalConfig.services.audioIncrement));
+    }
+
+    function deviceName(node: PwNode): string {
+        return customNames[node?.name] || node?.description || node?.name || Tr.trCtx("Unknown device", "unknown audio device");
+    }
+
+    // Empty name resets to the default
+    function renameDevice(node: PwNode, newName: string): void {
+        if (!node?.name)
+            return;
+        const names = Object.assign({}, customNames);
+        if (newName.trim())
+            names[node.name] = newName.trim();
+        else
+            delete names[node.name];
+        customNames = names;
+        namesFile.setText(JSON.stringify(names, null, 2));
     }
 
     function setAudioSink(newSink: PwNode): void {
@@ -131,7 +152,7 @@ Singleton {
         if (!sink?.ready)
             return;
 
-        const newSinkName = sink.description || sink.name || Tr.trCtx("Unknown device", "unknown audio device");
+        const newSinkName = deviceName(sink);
 
         if (previousSinkName && previousSinkName !== newSinkName && GlobalConfig.utilities.toasts.audioOutputChanged)
             Toaster.toast(Tr.tr("Audio output changed"), Tr.tr("Now using: %1").arg(newSinkName), "volume_up");
@@ -143,7 +164,7 @@ Singleton {
         if (!source?.ready)
             return;
 
-        const newSourceName = source.description || source.name || Tr.trCtx("Unknown device", "unknown audio device");
+        const newSourceName = deviceName(source);
 
         if (previousSourceName && previousSourceName !== newSourceName && GlobalConfig.utilities.toasts.audioInputChanged)
             Toaster.toast(Tr.tr("Audio input changed"), Tr.tr("Now using: %1").arg(newSourceName), "mic");
@@ -155,8 +176,8 @@ Singleton {
     // lazily-loaded singleton is created, so onValuesChanged would never fire.
     Component.onCompleted: {
         refreshNodes();
-        previousSinkName = sink?.description || sink?.name || Tr.trCtx("Unknown device", "unknown audio device");
-        previousSourceName = source?.description || source?.name || Tr.trCtx("Unknown device", "unknown audio device");
+        previousSinkName = deviceName(sink);
+        previousSourceName = deviceName(source);
     }
 
     Connections {
@@ -171,6 +192,20 @@ Singleton {
     // momentarily lag behind the default node.
     PwObjectTracker {
         objects: [root.sink, root.source, ...root.sinks, ...root.sources, ...root.streams].filter(n => n)
+    }
+
+    FileView {
+        id: namesFile
+
+        printErrors: false
+        path: `${Paths.state}/audio-names.json`
+        onLoaded: {
+            try {
+                root.customNames = JSON.parse(text()) || {};
+            } catch (e) {
+                console.warn("Audio: invalid audio-names.json:", e);
+            }
+        }
     }
 
     CavaProvider {
