@@ -75,6 +75,8 @@ if("shell" IN_LIST ENABLE_MODULES)
     install(PROGRAMS assets/wrap_term_launch.sh DESTINATION "${INSTALL_QSCONFDIR}/assets")
     install(PROGRAMS assets/app-uninstall.sh DESTINATION "${INSTALL_QSCONFDIR}/assets")
 
+    # Generated at configure time, so re-configure when it changes
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS shell.qml)
     file(READ shell.qml SHELL_QML)
     string(REPLACE "settings.watchFiles: true" "settings.watchFiles: false" SHELL_QML "${SHELL_QML}")
     file(WRITE "${CMAKE_BINARY_DIR}/qml/shell.qml" "${SHELL_QML}")
