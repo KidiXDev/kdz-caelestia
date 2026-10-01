@@ -12,6 +12,41 @@
 
 https://github.com/user-attachments/assets/0840f496-575c-4ca6-83a8-87bb01a85c5f
 
+## About this fork
+
+This is my personal fork of [caelestia-shell](https://github.com/caelestia-dots/shell). The rest of this
+README is from upstream and still applies.
+
+### What's different
+
+-   **Animated wallpapers.** Drop videos (mp4, webm, mkv, mov, avi, m4v) or GIFs into
+    `~/Pictures/Wallpapers/Animated` and pick them like any other wallpaper. They loop with hardware
+    decoding, and the colour scheme comes from the first frame. Playback pauses on a monitor with a
+    fullscreen window, in game mode and while the screen is locked. The decoder can be changed in
+    Nexus → Wallpaper & style. Needs `qt6-multimedia`, `qt6-multimedia-ffmpeg` and `ffmpeg`.
+-   **Display settings.** Nexus → Display lets you drag monitors around to arrange them and set
+    resolution, refresh rate, rotation and scale. Changes revert after 15 seconds unless you keep
+    them. Settings are saved to `~/.config/caelestia/hypr-monitors.lua`, so `~/.config/hypr` is left alone.
+-   **Uninstall apps.** Nexus → Apps can remove apps installed with pacman/AUR, Flatpak, Snap,
+    AppImage, Nix profile, Steam, Wine or as local shortcuts. It shows what will be removed first, and
+    won't remove packages the session needs.
+-   **Rename audio devices.** Give devices your own names in Nexus → Audio. The names show up in the
+    bar popout too.
+
+### Running it next to the AUR package
+
+The fork changes the C++ plugin as well as the QML, so it needs its own build. `scripts/fork-switch.sh`
+builds it into `~/.local/share/caelestia-fork` and switches between it and the AUR shell, without
+touching any files pacman owns.
+
+```sh
+scripts/fork-switch.sh           # menu
+scripts/fork-switch.sh fork      # build if needed and switch to the fork
+scripts/fork-switch.sh update    # rebuild and reinstall after changes
+scripts/fork-switch.sh upstream  # back to the AUR shell
+scripts/fork-switch.sh status    # which one is running
+```
+
 ## Components
 
 -   Widgets: [`Quickshell`](https://quickshell.outfoxxed.me)
