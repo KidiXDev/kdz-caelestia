@@ -292,9 +292,14 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
     const auto filter = m_filter;
     const auto nameFilters = m_nameFilters;
 
+    // Only entries under dir: the watcher also reports subdirectories, and diffing a subdirectory's
+    // scan against the whole model would remove everything outside it
+    const QString prefix = dir.endsWith(u'/') ? dir : dir + u'/';
     QSet<QString> oldPaths;
-    for (const auto& entry : std::as_const(m_entries))
-        oldPaths << entry->path();
+    for (const auto& entry : std::as_const(m_entries)) {
+        if (entry->path().startsWith(prefix))
+            oldPaths << entry->path();
+    }
 
     auto future = QtConcurrent::run([=](QPromise<PathDiff>& promise) {
         const auto flags = recursive ? QDirIterator::Subdirectories : QDirIterator::NoIteratorFlags;
@@ -412,10 +417,14 @@ void FileSystemModel::applyChanges(const QSet<QString>& removedPaths, const QSet
         endRemoveRows();
     }
 
-    // Create new entries
+    // Create new entries. Scans of a dir and its subdir can overlap and both report a path
+    QSet<QString> existing;
+    for (const auto& entry : std::as_const(m_entries))
+        existing << entry->path();
     QList<FileSystemEntry*> newEntries;
     for (const auto& path : addedPaths) {
-        newEntries << new FileSystemEntry(path, m_dir.relativeFilePath(path), this);
+        if (!existing.contains(path))
+            newEntries << new FileSystemEntry(path, m_dir.relativeFilePath(path), this);
     }
     std::ranges::sort(newEntries, [this](const FileSystemEntry* a, const FileSystemEntry* b) {
         return compareEntries(a, b);
