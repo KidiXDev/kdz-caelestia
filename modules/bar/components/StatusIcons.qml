@@ -37,6 +37,8 @@ StyledRect {
     function collapsed(entry: var): bool {
         if (entry.id === "lockStatus")
             return !Hypr.capsLock && !Hypr.numLock;
+        if (entry.id === "vpn")
+            return GlobalConfig.utilities.vpn.selectedProvider.length === 0;
         return false;
     }
 
@@ -123,6 +125,43 @@ StyledRect {
                             animate: true
                             text: Nmcli.activeEthernet ? "cable" : Nmcli.active ? Icons.getNetworkIcon(Nmcli.active.strength ?? 0) : "wifi_off"
                             color: root.colour
+                        }
+                    }
+                }
+                DelegateChoice {
+                    roleValue: "vpn"
+                    delegate: EntryWrapper {
+                        name: "network" // Hover shows the network popout
+                        visible: present
+
+                        Item {
+                            implicitWidth: vpnIcon.implicitWidth
+                            implicitHeight: vpnIcon.implicitHeight
+
+                            StateLayer {
+                                anchors.fill: undefined
+                                anchors.centerIn: parent
+                                implicitWidth: implicitHeight
+                                implicitHeight: vpnIcon.implicitHeight + Tokens.padding.small
+                                radius: Tokens.rounding.full
+                                disabled: VPN.connecting || VPN.disconnecting
+                                onClicked: VPN.toggle()
+                            }
+
+                            MaterialIcon {
+                                id: vpnIcon
+
+                                anchors.centerIn: parent
+                                animate: true
+                                text: VPN.connected ? "vpn_key" : "vpn_key_off"
+                                color: root.colour
+                                opacity: VPN.connecting || VPN.disconnecting ? 0.5 : 1
+                                fill: VPN.connected ? 1 : 0
+
+                                Behavior on opacity {
+                                    Anim {}
+                                }
+                            }
                         }
                     }
                 }

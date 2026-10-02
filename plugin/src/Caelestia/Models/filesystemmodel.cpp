@@ -292,12 +292,14 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
     const auto filter = m_filter;
     const auto nameFilters = m_nameFilters;
 
-    // Only entries under dir: the watcher also reports subdirectories, and diffing a subdirectory's
-    // scan against the whole model would remove everything outside it
+    // A scan of the root replaces everything (including entries left over from a previous path).
+    // Otherwise only entries under dir: the watcher also reports subdirectories, and diffing a
+    // subdirectory's scan against the whole model would remove everything outside it
+    const bool isRoot = dir == m_path;
     const QString prefix = dir.endsWith(u'/') ? dir : dir + u'/';
     QSet<QString> oldPaths;
     for (const auto& entry : std::as_const(m_entries)) {
-        if (entry->path().startsWith(prefix))
+        if (isRoot || entry->path().startsWith(prefix))
             oldPaths << entry->path();
     }
 

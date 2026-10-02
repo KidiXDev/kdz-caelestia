@@ -83,7 +83,34 @@ Singleton {
     readonly property string interfaceName: active.interface
     readonly property var currentConfig: active
 
-    readonly property var adapters: [wireguardAdapter, warpAdapter, netbirdAdapter, tailscaleAdapter]
+    readonly property var adapters: [wireguardAdapter, warpAdapter, netbirdAdapter, tailscaleAdapter, openvpnAdapter]
+
+    // Pending OpenVPN import: credentials to feed over stdin and the callback
+    // that receives the NetworkManager connection name ("" on failure).
+    property var importJob: null
+
+    // Imports/updates the NM connection; args: $1 = .ovpn file (optional),
+    // $2 = existing connection name. Reads username/password from stdin.
+    readonly property string openvpnImportScript: `set -e
+IFS= read -r user || true
+IFS= read -r pass || true
+# vpn.data / vpn.secrets are comma separated; escape commas and backslashes
+esc() { printf '%s' "$1" | sed 's/[\\\\,]/\\\\&/g'; }
+uuid_re='[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}'
+if [ -n "$1" ]; then
+    uuid=$(nmcli connection import type openvpn file "$1" | grep -oE "$uuid_re")
+else
+    uuid=$(nmcli -g connection.uuid connection show id "$2")
+fi
+[ -n "$uuid" ]
+if [ -n "$user" ]; then
+    nmcli connection modify uuid "$uuid" +vpn.data "username=$(esc "$user")"
+fi
+if [ -n "$pass" ]; then
+    nmcli connection modify uuid "$uuid" +vpn.data password-flags=0
+    printf 'set vpn.secrets password=%s\\nsave\\nquit\\n' "$(esc "$pass")" | nmcli connection edit uuid "$uuid" >/dev/null
+fi
+nmcli -g connection.id connection show uuid "$uuid"`
 
     // Live list of configured providers, straight from the typed config list.
     // Each entry is a config node with id/name/displayName/interface and the
@@ -386,6 +413,48 @@ Singleton {
         return status;
     }
 
+    // Status of a NetworkManager VPN connection by name, from
+    // `nmcli -t -f TYPE,STATE,NAME connection show --active`. NAME is last so
+    // only its escaped colons need undoing.
+    function parseNmVpnStatus(output: string, name: string): var {
+        const status = {
+            connected: false,
+            state: "disconnected",
+            reason: "",
+            authUrl: "",
+            server: ""
+        };
+
+        for (const line of output.split("\n")) {
+            const m = line.match(/^([^:]*):([^:]*):(.*)$/);
+            if (!m || m[1] !== "vpn" || m[3].replace(/\\(.)/g, "$1") !== name)
+                continue;
+            if (m[2] === "activated") {
+                status.connected = true;
+                status.state = "connected";
+            } else if (m[2] === "activating") {
+                status.state = "connecting";
+            }
+            break;
+        }
+        return status;
+    }
+
+    // Import an .ovpn file into NetworkManager (when `file` is set) or target
+    // the existing connection `name`, then store the credentials on it.
+    // Credentials go over stdin so the password never shows up in argv.
+    // `callback(name)` gets the connection name, or "" on failure.
+    function importOpenVpn(file: string, name: string, user: string, pass: string, callback: var): void {
+        if (openvpnImportProc.running)
+            return;
+        root.importJob = {
+            input: `${user}\n${pass}\n`,
+            callback: callback
+        };
+        openvpnImportProc.command = ["sh", "-c", root.openvpnImportScript, "sh", file, name];
+        openvpnImportProc.running = true;
+    }
+
     function parseWarpServer(output: string): string {
         // Look for an endpoint hint in the tunnel stats output. WARP shows an
         // "Endpoint" line with the server IP.
@@ -601,6 +670,22 @@ Singleton {
         connectHint: error => error.includes("Access denied") || error.includes("checkprefs access denied") ? Tr.mark("Permission denied. Run in terminal: %1", ["sudo tailscale set --operator=$USER"]) : ""
     }
 
+    Adapter {
+        id: openvpnAdapter
+
+        name: "openvpn"
+        // Driven through NetworkManager (networkmanager-openvpn); the
+        // provider's interface field holds the NM connection name.
+        display: iface => iface
+        service: "NetworkManager"
+        connectCmd: iface => ["nmcli", "connection", "up", "id", iface]
+        disconnectCmd: iface => ["nmcli", "connection", "down", "id", iface]
+        statusCmd: ["nmcli", "-t", "-f", "TYPE,STATE,NAME", "connection", "show", "--active"]
+        parse: out => root.parseNmVpnStatus(out, root.active.interface)
+        // TRANSLATORS: %1 = a package name, leave it untranslated
+        connectHint: error => error.includes("plugin") && error.includes("openvpn") ? Tr.mark("OpenVPN plugin missing. Install: %1", ["networkmanager-openvpn"]) : ""
+    }
+
     // ── Generic engine ──────────────────────────────────────────────────────
 
     Process {
@@ -799,6 +884,36 @@ Singleton {
                         root.serverLocation = server;
                 }
             }
+        }
+    }
+
+    Process {
+        id: openvpnImportProc
+
+        stdinEnabled: true
+        // qmllint disable incompatible-type
+        environment: ({
+                // qmllint enable incompatible-type
+                LANG: "C.UTF-8",
+                LC_ALL: "C.UTF-8"
+            })
+        onStarted: write(root.importJob?.input ?? "\n\n")
+        stdout: StdioCollector {
+            id: importOut
+        }
+        stderr: StdioCollector {
+            id: importErr
+        }
+        onExited: exitCode => { // qmllint disable signal-handler-parameters
+            const job = root.importJob;
+            root.importJob = null;
+            const name = exitCode === 0 ? importOut.text.trim() : "";
+            if (!name) {
+                const error = importErr.text.trim();
+                console.warn(lc, "OpenVPN import failed:", error);
+                Toaster.toast(Tr.tr("OpenVPN import failed"), error.split("\n").pop() || Tr.tr("Unknown error"), "vpn_key_alert");
+            }
+            job?.callback?.(name);
         }
     }
 
