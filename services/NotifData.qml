@@ -137,7 +137,7 @@ QtObject {
         }
 
         function onAppIconChanged(): void {
-            notif.appIcon = notif.notification.appIcon;
+            notif.appIcon = notif.persist(notif.notification.appIcon);
         }
 
         function onAppNameChanged(): void {
@@ -145,7 +145,7 @@ QtObject {
         }
 
         function onImageChanged(): void {
-            notif.image = notif.notification.image;
+            notif.image = notif.persist(notif.notification.image);
             notif.maybeTriggerDummyImageLoader();
         }
 
@@ -202,6 +202,15 @@ QtObject {
         }
     }
 
+    function persist(src: string): string {
+        const file = src.replace(/^image:\/\/icon\//, "").replace(/^file:\/\//, "");
+        if (!file.startsWith("/") || file.startsWith(Paths.notifimagecache))
+            return src;
+
+        const cache = `${Paths.notifimagecache}/${file.replace(/\//g, "_")}`;
+        return CUtils.copyFile(Qt.resolvedUrl(file), Qt.resolvedUrl(cache)) ? cache : src;
+    }
+
     function maybeTriggerDummyImageLoader(): void {
         if (image && !image.startsWith("image://icon/") && !image.startsWith(Paths.notifimagecache))
             dummyImageLoader.active = true;
@@ -226,6 +235,10 @@ QtObject {
         }
     }
 
+    // Chromium-based browsers prepend the site as a link, e.g. <a href="https://web.whatsapp.com/">web.whatsapp.com</a>\n\n
+    // Done on change so it covers new, updated and stored notifications
+    onBodyChanged: body = body.replace(/^<a href="[^"]*">[^<]*<\/a>\n\n/, "")
+
     Component.onCompleted: {
         if (!notification)
             return;
@@ -233,9 +246,9 @@ QtObject {
         notificationId = notification.id;
         summary = notification.summary;
         body = notification.body;
-        appIcon = notification.appIcon;
+        appIcon = persist(notification.appIcon);
         appName = notification.appName;
-        image = notification.image;
+        image = persist(notification.image);
         maybeTriggerDummyImageLoader();
         expireTimeout = notification.expireTimeout;
         hints = notification.hints;

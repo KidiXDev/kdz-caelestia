@@ -5,3 +5,5 @@ build/
 .cache/
 logs
 plugin/src/Caelestia/I18n/trs/raw.pot
+
+.sentry-native

@@ -91,6 +91,7 @@ bool CUtils::copyFile(const QUrl& source, const QUrl& target, bool overwrite) {
         }
     }
 
+    QDir().mkpath(QFileInfo(target.toLocalFile()).absolutePath());
     return QFile::copy(source.toLocalFile(), target.toLocalFile());
 }
 

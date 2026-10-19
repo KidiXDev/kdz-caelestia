@@ -408,7 +408,8 @@ StyledRect {
             TextMetrics {
                 id: bodyPreviewMetrics
 
-                text: root.modelData.body
+                // Strip tags so eliding can't cut through markup like <a href="...">
+                text: root.modelData.body.replace(/<[^>]*>/g, "").replace(/\n/g, " ")
                 font: bodyPreview.font
                 elide: Text.ElideRight
                 elideWidth: bodyPreview.width
