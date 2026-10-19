@@ -749,7 +749,7 @@ nmcli -g connection.id connection show uuid "$uuid"`
             }
         }
 
-        onExited: exitCode => { // qmllint disable signal-handler-parameters
+        onExited: exitCode => {
             root.connectExited = true;
 
             // Deferred so an auth URL parsed from the output wins the race.
@@ -818,7 +818,7 @@ nmcli -g connection.id connection show uuid "$uuid"`
             }
         }
 
-        onExited: { // qmllint disable signal-handler-parameters
+        onExited: {
             root.disconnectExited = true;
             statusCheckTimer.start();
         }
@@ -835,7 +835,7 @@ nmcli -g connection.id connection show uuid "$uuid"`
     Process {
         id: registerProc
 
-        onExited: exitCode => { // qmllint disable signal-handler-parameters
+        onExited: exitCode => {
             if (exitCode === 0) {
                 statusCheckTimer.start();
             }

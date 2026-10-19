@@ -225,7 +225,7 @@ void FileSystemModel::watchDirIfRecursive(const QString& path) {
     if (m_recursive && m_watchChanges) {
         const auto currentDir = m_dir;
         const bool showHidden = m_showHidden;
-        auto future = QtConcurrent::run([showHidden, path]() {
+        auto future = QtConcurrent::run([showHidden, path] {
             QDir::Filters filters = QDir::Dirs | QDir::NoDotAndDotDot;
             if (showHidden) {
                 filters |= QDir::Hidden;
@@ -292,9 +292,6 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
     const auto filter = m_filter;
     const auto nameFilters = m_nameFilters;
 
-    // A scan of the root replaces everything (including entries left over from a previous path).
-    // Otherwise only entries under dir: the watcher also reports subdirectories, and diffing a
-    // subdirectory's scan against the whole model would remove everything outside it
     const bool isRoot = dir == m_path;
     const QString prefix = dir.endsWith(u'/') ? dir : dir + u'/';
     QSet<QString> oldPaths;
@@ -323,7 +320,7 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
                 if (!result.removed.isEmpty() || !result.added.isEmpty())
                     applyChanges(result.removed, result.added);
             })
-        .onCanceled(this, [dir, this]() {
+        .onCanceled(this, [dir, this] {
             m_futures.remove(dir);
         });
 }
@@ -419,7 +416,7 @@ void FileSystemModel::applyChanges(const QSet<QString>& removedPaths, const QSet
         endRemoveRows();
     }
 
-    // Create new entries. Scans of a dir and its subdir can overlap and both report a path
+    // Create new entries
     QSet<QString> existing;
     for (const auto& entry : std::as_const(m_entries))
         existing << entry->path();
